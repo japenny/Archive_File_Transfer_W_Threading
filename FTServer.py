@@ -9,6 +9,8 @@ from lib import params
 from archiver import Archiver
 
 class FileServer:
+    """Server that receives and extracts archive files from clients."""
+
     def __init__(self, port):
         self.listen_port = port
         self.server_socket = self.create_server_socket()
@@ -16,7 +18,11 @@ class FileServer:
         self.clients = {} # Dictionary to track connected clients
 
     def create_server_socket(self):
-        # Initialize and bind the server socket
+        """Initialize the file server with the specified port.
+
+        Args:
+            port (int): The port number to listen on.
+        """
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind(('', self.listen_port))
@@ -27,7 +33,8 @@ class FileServer:
         return s
 
     def accept_connection(self):
-        # Accept a new client connection and configure it
+        """Accept and initialize a new client connection."""
+
         conn, addr = self.server_socket.accept()
         conn.setblocking(False)  # Set client socket to non-blocking mode
         print(f"Connection from {addr}")
@@ -44,7 +51,11 @@ class FileServer:
         }
 
     def handle_client(self, sock):
-        # process data for existing client
+        """Process incoming data from an existing client.
+
+        Args:
+            sock (socket): The client socket to process data from.
+        """
         client = self.clients[sock]
         try:
             data = sock.recv(4096)
@@ -62,18 +73,28 @@ class FileServer:
             self.close_connection(sock, f"Error: {e}")
 
     def process_header(self, sock, client):
-        # Parse header containing filename and file size
+        """Parse the header containing filename and file size.
+
+        Args:
+            sock (socket): The client socket.
+            client (dict): Client state dictionary.
+        """
         parts = client['buffer'].split(b'\n', 2)
         name, size, rest = parts
 
-        client['archive_name'] = f"new_{name.decode().strip()}" # Prefix filename with 'new_'
-        client['file_size'] = int(size.decode().strip()) # Convert file size to int
+        client['archive_name'] = f"{name.decode().strip()}"
+        client['file_size'] = int(size.decode().strip())
         client['buffer'] = rest # Remaining data after header
         client['state'] = 'data' # Move to data-receiving state
         client['fd_out'] = open(client['archive_name'], 'wb') # Open file for writing
 
     def process_data(self, sock, client):
-        # Write incoming file data to file
+        """Handle incoming file data and extract archive when complete.
+
+        Args:
+            sock (socket): The client socket.
+            client (dict): Client state dictionary.
+        """
         remaining = client['file_size'] - client['received'] # Calculate remaining bytes
         chunk = client['buffer'][:remaining] # Extract up to 'remaining' bytes
 
@@ -92,7 +113,12 @@ class FileServer:
             self.close_connection(sock, "Transfer complete") # Close connection after processing
 
     def close_connection(self, sock, reason=""):
-        # Clean up and close a client connection
+        """Clean up resources and close a client connection.
+
+        Args:
+            sock (socket): The client socket to close.
+            reason (str, optional): Reason for closing the connection. Defaults to "".
+        """
         client = self.clients.get(sock)
         if client:
             try:
@@ -106,7 +132,7 @@ class FileServer:
         self.clients.pop(sock, None)
 
     def run(self):
-        # Main server loop
+        """Run the main server event loop using select for I/O multiplexing."""
         while True:
             readable, _, exceptional = select.select(self.read_list, [], self.read_list)
 
@@ -121,7 +147,11 @@ class FileServer:
 
 
 def main():
-    # Parse command-line arguments
+    """Parse command line arguments and start the file server.
+
+    Returns:
+        None
+    """
     switches_var_defaults = (
         (('-l', '--listenPort'), 'listenPort', 50001), # Default listen port is 50001
         (('-?', '--usage'), "usage", False), # Help flag
